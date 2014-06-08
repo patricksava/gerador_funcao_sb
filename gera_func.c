@@ -5,17 +5,38 @@
 
 void* gera_func(void* f, int n, Parametro params[]){
 	
-	unsigned char code_header[] = {0x55,0x89,0xe5,0};
-	unsigned char code_footer[] = {0x89,0xec,0x5d,0xc3,0};
+	/*
+		0x55 	  - push   %ebp
+		0x89 0xe5 - mov    %esp,%ebp
+		0x55 	  - push   %ebx
+	*/	
+	unsigned char code_header[] = {0x55,0x89,0xe5};
+	/* 
+		0x5d	   - pop    %ebx
+		0x89 0xec  - mov    %ebp,%esp
+    	0x5d	   - pop    %ebp
+    	0xc3	   - ret    
+
+	*/
+	unsigned char code_footer[] = {0x89,0xec,0x5d,0xc3};
+	/*
+		0xe8 	  - call endereço(0,0,0,0)
+	*/
+	unsigned char code_call[] = {0xe8, 0, 0, 0, 0};
+
 	unsigned char* code;
-	unsigned char* code_body;
-	unsigned char code_call[6] = {0xe8, 0, 0, 0, 0, 0};
+	unsigned char* code_initializer;
+	unsigned char* code_finalizer;
+
 	
-	code_body = (unsigned char*) malloc( n * 5 );
+	//para cada parametro tem um push (1 byte) e o endereco(4 bytes)
+	code_initializer = (unsigned char*) malloc( n * 5 );
+	code_finalizer = (unsigned char*) malloc( n );
 	
-	code = (unsigned char*) malloc( (n * 5) + 7 );
+	//o tamanho total do codigo sao os push com os enderecos e a cabeça e cauda de codigo
+	code = (unsigned char*) malloc( (n * 5) + n + 12 );
 	
-	code_body[0] = 0;
+	code_initializer[0] = 0;
 	
 	code[0] = 0;
 
@@ -52,7 +73,8 @@ void* gera_func(void* f, int n, Parametro params[]){
 					break;
 			}
 
-			strncat(code_body, body, 2);
+			memcpy(&code_initializer[i*2], body, 2);
+			code_finalizer[i] = 0x5d;
 		
 		} 
 		else {
@@ -80,14 +102,15 @@ void* gera_func(void* f, int n, Parametro params[]){
 		
 	}
 
-	strcat(code, code_header);
-	strcat(code, code_body);
+	memcpy(code, code_header, 3);
+	memcpy(&code[ 3 ], code_initializer, n*5);
 
-	strcat(code, code_call);
+	memcpy(&code[ n*5 + 3 ], code_call,5);
+	
+	memcpy(&code[ n*5 + 8 ], code_finalizer, n);
+	memcpy(&code[ n*5 + 8 + n ], code_footer,4);	
 
-	strcat(code, code_footer);	
-
-	//free(&code_body);
+	//free(&code_initializer);
 
 	return code;
 }
