@@ -27,25 +27,31 @@ void* gera_func(void* f, int n, Parametro params[]){
 
 	
 	//para cada parametro tem um push (1 byte) e o endereco(4 bytes)
-	code_initializer = (unsigned char*) malloc( n * 5 );
+	code_initializer = (unsigned char*) malloc( n * 10 );
 	
 	//o tamanho total do codigo sao os push com os enderecos e a cabeça e cauda de codigo
 	code = (unsigned char*) malloc( (n * 5) + 12 );
 		
-
+	int body_tam = 0;
 	// Gerar código de máquina conforme os parâmetros passados
 	int i;
 	for( i = 0; i < n; i++ ){
 		if(	params[i].tipo == DOUBLE_PAR){
 			if(params[i].amarrado){
-				//body[1] = params[i].valor.v_double;
-				//pushl params[i].valor.v_double
-				break;
+				unsigned char body[10];
+				unsigned int* pointer;
+				pointer = &(params[i].valor.v_double);
+				body[0] = 0x68; //pushl
+				*((int*)&body[1]) = pointer[0];
+				body[5] = 0x68; //pushl
+				*((int*)&body[6]) = pointer[1];
+				body_tam_delta = 10;
 			}
 			else{
+				unsigned char body[10]; 
 				// pushl 4+(4*posicao)(%ebp)
 				// pushl 4+(4*(posicao+1))(%ebp)
-				break;
+				body_tam_delta = 6;
 			}
 		}
 		else{
@@ -56,7 +62,6 @@ void* gera_func(void* f, int n, Parametro params[]){
 					case INT_PAR:
 						//pushl params[i].valor.v_int
 						*((int*)&body[1]) = params[i].valor.v_int;
-						//body[1] = params[i].valor.v_int;
 						break;
 					case PTR_PAR:
 						//pushl params[i].valor.v_ptr
@@ -69,6 +74,7 @@ void* gera_func(void* f, int n, Parametro params[]){
 					default:
 						break;
 				}
+				body_tam_delta = 5;
 			} 
 			else {
 				body[0] = 0xff; //pushl
@@ -78,8 +84,10 @@ void* gera_func(void* f, int n, Parametro params[]){
 				body[2] = 4+4*params[i].posicao;
 				//body[3] = 0x00;
 				//body[4] = 0x00;
+				body_tam_delta = 3;
 			}
-			memcpy(&code_initializer[i*5], body, 5);		
+			memcpy(&code_initializer[body_tam], body, body_tam_delta);	
+			body_tam += body_tam_delta;	
 		}
 		
 	}
@@ -87,8 +95,8 @@ void* gera_func(void* f, int n, Parametro params[]){
 	int tam_code_call;
 	memcpy(code, code_header, 3);
 	tam += 3;
-	memcpy(&code[ tam ], code_initializer, n*5);
-	tam += n*5;
+	memcpy(&code[ tam ], code_initializer, body_tam);
+	tam += body_tam;
 	memcpy(&code[ tam ], code_call,5);
 	tam_code_call = tam;
 	tam += 5;
