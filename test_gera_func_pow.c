@@ -14,11 +14,11 @@ int main (void) {
    double d;
    int i;
 
-   params[0].tipo = CHAR_PAR;
+   params[0].tipo = INT_PAR;
    params[0].amarrado = 1;
    //params[0].posicao = 1;
    params[0].valor.v_int = 4;
-   params[1].tipo = CHAR_PAR;
+   params[1].tipo = INT_PAR;
    params[1].amarrado = 1;
    params[1].valor.v_int = 2;
 

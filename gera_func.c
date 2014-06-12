@@ -8,11 +8,9 @@ void* gera_func(void* f, int n, Parametro params[]){
 	/*
 		0x55 	  - push   %ebp
 		0x89 0xe5 - mov    %esp,%ebp
-		0x55 	  - push   %ebx
 	*/	
 	unsigned char code_header[] = {0x55,0x89,0xe5};
 	/* 
-		0x5d	   - pop    %ebx
 		0x89 0xec  - mov    %ebp,%esp
     	0x5d	   - pop    %ebp
     	0xc3	   - ret    
@@ -22,95 +20,83 @@ void* gera_func(void* f, int n, Parametro params[]){
 	/*
 		0xe8 	  - call endereço(0,0,0,0)
 	*/
-	unsigned char code_call[] = {0xe8, 0, 0, 0, 0};
+	unsigned char code_call[] = {0xe8, 0xfc, 0xff, 0xff, 0xff};
 
 	unsigned char* code;
 	unsigned char* code_initializer;
-	unsigned char* code_finalizer;
 
 	
 	//para cada parametro tem um push (1 byte) e o endereco(4 bytes)
 	code_initializer = (unsigned char*) malloc( n * 5 );
-	code_finalizer = (unsigned char*) malloc( n );
 	
 	//o tamanho total do codigo sao os push com os enderecos e a cabeça e cauda de codigo
-	code = (unsigned char*) malloc( (n * 5) + n + 12 );
-	
-	code_initializer[0] = 0;
-	
-	code[0] = 0;
-
-	*((int*)&code_call[1]) = ((int)( (int)&f - (int)&code_call[5])); 
+	code = (unsigned char*) malloc( (n * 5) + 12 );
+		
 
 	// Gerar código de máquina conforme os parâmetros passados
 	int i;
 	for( i = 0; i < n; i++ ){
-
-		if(params[i].amarrado){
-			int x;
-			unsigned char body[2];
-			body[0] = 0x68; //pushl
-			switch (params[i].tipo){
-				case INT_PAR:
-					*((int*)&body[1]) = params[i].valor.v_int;
-					//pushl params[i].valor.v_int
-					break;
-				case PTR_PAR:
-					*((int*)&body[1]) = params[i].valor.v_ptr;
-					//pushl params[i].valor.v_ptr
-					break;
-				case CHAR_PAR:
-					body[0] = 0x6A; //pushl
-					body[1] = params[i].valor.v_char;
-					//pushl params[i].valor.v_char
-					break;
-				case DOUBLE_PAR:
-					//body[1] = params[i].valor.v_double;
-					//pushl params[i].valor.v_double
-					break;
-
-				default:
-					break;
+		if(	params[i].tipo == DOUBLE_PAR){
+			if(params[i].amarrado){
+				//body[1] = params[i].valor.v_double;
+				//pushl params[i].valor.v_double
+				break;
 			}
-
-			memcpy(&code_initializer[i*2], body, 2);
-			code_finalizer[i] = 0x5d;
-		
-		} 
-		else {
-			switch (params[i].tipo){
-				case INT_PAR: //4 bytes
-					// pushl 4+(4*posicao)(%ebp)
-					break;
-				case PTR_PAR: //4 bytes
-
-					// pushl 4+(4*posicao)(%ebp)
-					break;
-				case CHAR_PAR: //1 byte
-					// pushl 4+(posicao)(%ebp)
-					break;
-				case DOUBLE_PAR: //8 bytes
-					// pushl 4+(4*posicao)(%ebp)
-					// pushl 4+(4*(posicao+1))(%ebp)
-					break;
-
-				default:
-					break;
+			else{
+				// pushl 4+(4*posicao)(%ebp)
+				// pushl 4+(4*(posicao+1))(%ebp)
+				break;
 			}
 		}
-		
+		else{
+			unsigned char body[5];
+			if(params[i].amarrado){
+				body[0] = 0x68; //pushl
+				switch (params[i].tipo){
+					case INT_PAR:
+						//pushl params[i].valor.v_int
+						*((int*)&body[1]) = params[i].valor.v_int;
+						//body[1] = params[i].valor.v_int;
+						break;
+					case PTR_PAR:
+						//pushl params[i].valor.v_ptr
+						*((int*)&body[1]) = params[i].valor.v_ptr;
+						break;
+					case CHAR_PAR:
+						//pushl params[i].valor.v_char
+						*((int*)&body[1]) = params[i].valor.v_char;
+						break;
+					default:
+						break;
+				}
+			} 
+			else {
+				body[0] = 0xff; //pushl
+				body[1] = 0x75; //pushl
+				// 4+(4*posicao)(%ebp)
+				//*((int*)&body[2]) = 4+4*params[i].posicao;
+				body[2] = 4+4*params[i].posicao;
+				//body[3] = 0x00;
+				//body[4] = 0x00;
+			}
+			memcpy(&code_initializer[i*5], body, 5);		
+		}
 		
 	}
-
+	int tam = 0;
+	int tam_code_call;
 	memcpy(code, code_header, 3);
-	memcpy(&code[ 3 ], code_initializer, n*5);
+	tam += 3;
+	memcpy(&code[ tam ], code_initializer, n*5);
+	tam += n*5;
+	memcpy(&code[ tam ], code_call,5);
+	tam_code_call = tam;
+	tam += 5;
+	memcpy(&code[ tam ], code_footer,4);
 
-	memcpy(&code[ n*5 + 3 ], code_call,5);
-	
-	memcpy(&code[ n*5 + 8 ], code_finalizer, n);
-	memcpy(&code[ n*5 + 8 + n ], code_footer,4);	
-
-	//free(&code_initializer);
+	int a = (int)&f ;//- (int)&code[tam-1];
+	//*((int*)&code[tam_code_call]) = a;	
+	 
 
 	return code;
 }
