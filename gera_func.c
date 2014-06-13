@@ -31,32 +31,60 @@ void* gera_func(void* f, int n, Parametro params[]){
 	
 	//o tamanho total do codigo sao os push com os enderecos e a cabeça e cauda de codigo
 	code = (unsigned char*) malloc( (n * 5) + 12 );
+	int i;
+	int qtdDinamicos = 0;
+	int* pos_param = (int*) malloc( n * sizeof(int) );
+	
+	for(i = 0; i < n; i++){
+		if(!params[i].amarrado){
+			pos_param[params[i].posicao-1] = i;
+			qtdDinamicos++;
+		}
+	}
+	
+	int* offset_param = (int*) malloc( qtdDinamicos * sizeof(int) );
+	offset_param[0] = 8;
+	for(i = 1; i < qtdDinamicos; i++){
+		int type_offset = 4;
+		if(params[pos_param[i-1]].tipo == DOUBLE_PAR)
+			type_offset += 4;
+
+		offset_param[i] = offset_param[i-1] + type_offset;
+	}
+
 		
 	int body_tam = 0;
+	int body_tam_delta = 0;
 	// Gerar código de máquina conforme os parâmetros passados
-	int i;
-	for( i = 0; i < n; i++ ){
+	
+	for( i = n-1; i >= 0; i-- ){
+		unsigned char *body;
 		if(	params[i].tipo == DOUBLE_PAR){
 			if(params[i].amarrado){
-				unsigned char body[10];
+				body_tam_delta = 10;
+				body = (unsigned char*) malloc( body_tam_delta );
 				unsigned int* pointer;
 				pointer = &(params[i].valor.v_double);
 				body[0] = 0x68; //pushl
 				*((int*)&body[1]) = pointer[0];
 				body[5] = 0x68; //pushl
 				*((int*)&body[6]) = pointer[1];
-				body_tam_delta = 10;
 			}
 			else{
-				unsigned char body[10]; 
-				// pushl 4+(4*posicao)(%ebp)
-				// pushl 4+(4*(posicao+1))(%ebp)
 				body_tam_delta = 6;
+				body = (unsigned char*) malloc( body_tam_delta );
+				body[0] = 0xff; //pushl
+				body[1] = 0x75; //pushl
+				body[2] = offset_param[params[i].posicao-1];
+				body[3] = 0xff; //pushl
+				body[4] = 0x75; //pushl
+				body[5] = offset_param[params[i].posicao-1] + 4;
 			}
 		}
 		else{
-			unsigned char body[5];
 			if(params[i].amarrado){
+				body_tam_delta = 5;
+				body = (unsigned char*) malloc( body_tam_delta );
 				body[0] = 0x68; //pushl
 				switch (params[i].tipo){
 					case INT_PAR:
@@ -74,22 +102,17 @@ void* gera_func(void* f, int n, Parametro params[]){
 					default:
 						break;
 				}
-				body_tam_delta = 5;
 			} 
 			else {
+				body_tam_delta = 3;
+				body = (unsigned char*) malloc( body_tam_delta );
 				body[0] = 0xff; //pushl
 				body[1] = 0x75; //pushl
-				// 4+(4*posicao)(%ebp)
-				//*((int*)&body[2]) = 4+4*params[i].posicao;
-				body[2] = 4+4*params[i].posicao;
-				//body[3] = 0x00;
-				//body[4] = 0x00;
-				body_tam_delta = 3;
+				body[2] = offset_param[params[i].posicao-1];
 			}
-			memcpy(&code_initializer[body_tam], body, body_tam_delta);	
-			body_tam += body_tam_delta;	
 		}
-		
+		memcpy(&code_initializer[body_tam], body, body_tam_delta);	
+		body_tam += body_tam_delta;		
 	}
 	int tam = 0;
 	int tam_code_call;
@@ -98,12 +121,12 @@ void* gera_func(void* f, int n, Parametro params[]){
 	memcpy(&code[ tam ], code_initializer, body_tam);
 	tam += body_tam;
 	memcpy(&code[ tam ], code_call,5);
-	tam_code_call = tam;
+	tam_code_call = tam + 1;
 	tam += 5;
 	memcpy(&code[ tam ], code_footer,4);
 
-	int a = (int)&f ;//- (int)&code[tam-1];
-	//*((int*)&code[tam_code_call]) = a;	
+	int a = (int)f - (int)&code[tam];
+	*((int*)&code[tam_code_call]) = a;	
 	 
 
 	return code;
