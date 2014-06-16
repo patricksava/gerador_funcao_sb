@@ -100,7 +100,8 @@ void libera_func(void* func){
 }
 
 int preencheVetorEntradasDinamicas( Parametro* params, int* pos_param, int n ){
-	int i, qtdDinamicos;
+	int i; 
+	int qtdDinamicos = 0;
 	for(i = 0; i < n; i++){
 		if(!params[i].amarrado){
 			pos_param[params[i].posicao-1] = i;
